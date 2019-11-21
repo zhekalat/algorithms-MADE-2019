@@ -1,6 +1,5 @@
 #include <iostream>
 #include <stack>
-#include <random>
 
 // узел декартова дерева
 struct TreapNode {
@@ -9,7 +8,8 @@ struct TreapNode {
 
     int value = 0;
     int priority = 0;
-    int position = 0;  // счётчик левых детей
+    int left_children = 0;  // на позицию текущего узла влияют только левые потомки,
+    int total_children = 0;  // но на позицию его родителя влияют и правые потомки, поэтому храним 2 счётчика
     TreapNode* left = nullptr;
     TreapNode* right = nullptr;
 };
@@ -24,9 +24,9 @@ public:
 private:
     TreapNode* root = nullptr;
     void delete_subtree(TreapNode* node);
-    std::pair<TreapNode*, TreapNode*> split(TreapNode* node, int x);
+    std::pair<TreapNode*, TreapNode*> split(TreapNode* node, int key);
     TreapNode* merge(TreapNode*, TreapNode*);
-    int update_position(TreapNode* currNode);
+    void update_child_count(TreapNode* currNode);
 };
 
 // разрезаем декартово дерево по ключу
@@ -37,10 +37,12 @@ std::pair<TreapNode*, TreapNode*> Treap::split(TreapNode* node, int key) {
     if (node->value <= key) {
         const auto right_pair = split(node->right, key);
         node->right = right_pair.first;
+        update_child_count(node);
         return std::make_pair(node, right_pair.second);
     } else {
         const auto left_pair = split(node->left, key);
         node->left = left_pair.second;
+        update_child_count(node);
         return std::make_pair(left_pair.first, node);
     }
 }
@@ -56,9 +58,11 @@ TreapNode* Treap::merge(TreapNode* left, TreapNode* right) {
     }
     if (left->priority > right->priority) {
         left->right = merge(left->right, right);
+        update_child_count(left);
         return left;
     } else {
         right->left = merge(left, right->left);
+        update_child_count(right);
         return right;
     }
 }
@@ -72,57 +76,52 @@ void Treap::Add(int value) {
     TreapNode* leftRoot;
     leftRoot = merge(pair.first, newNode);
     root = merge(leftRoot, pair.second);
-    update_position(root);
 }
 
-// удаляем элемент из декартового дерева
+// удаляем элемент из декартова дерева
 void Treap::Pop(int value) {
     std::pair<TreapNode*, TreapNode*> pair;
     pair = split(root, value);
     std::pair<TreapNode*, TreapNode*> leftPair;
     leftPair = split(pair.first, value-1); // так как наши значения имеют тип int, берем epsilon = 1
     root = merge(leftPair.first, pair.second);
-    update_position(root);
 }
 
-// при добавлении или удалении узла пересчитываем количество детей в левом поддереве для всех узлов (неоптимально?)
-int Treap::update_position(TreapNode* currNode) {
-    if (currNode == nullptr) {
-        return 0;
-    }
-    if (currNode->left == nullptr) {
-        currNode->position = 0;
-        return update_position(currNode->right) + 1;
+// при изменении структуры дерева пересчитываем его детей
+void Treap::update_child_count(TreapNode* currNode) {
+    if (currNode->left != nullptr) {
+        currNode->left_children = currNode->left->total_children + 1;
+        if (currNode->right != nullptr) {
+            currNode->total_children = currNode->left_children + currNode->right->total_children + 1;
+        } else {
+            currNode->total_children = currNode->left_children;
+        }
     } else {
-        currNode->position = update_position(currNode->left);
-        return currNode->position + update_position(currNode->right) + 1;
+        currNode->left_children = 0;
+        if (currNode->right != nullptr) {
+            currNode->total_children = currNode->right->total_children + 1;
+        } else {
+            currNode->total_children = currNode->left_children;
+        }
     }
 }
 
 // возвращаем k-ую статистику
 int Treap::GetKStat(int k) {
-    if (root)
-    {
-        TreapNode* currNode = root;
-        while (currNode)
-        {
-            if ( k == currNode->position)
-            {
-                return currNode->value;
-            }
-            else if (k > currNode->position)
-            {
-                // вычитаем из k количество элементов левого поддерева (+ текущий), чтобы учесть их при проходе правого
-                k -= currNode->position + 1;
-                currNode = currNode->right;
-            }
-            else
-            {
-                currNode = currNode->left;
-            }
+    TreapNode* currNode = root;
+    while (currNode) {
+        if (k == currNode->left_children) {
+            return currNode->value;
+        }
+        else if (k > currNode->left_children) {
+            // вычитаем из k количество элементов левого поддерева (+ текущий), чтобы учесть их при проходе правого
+            k -= currNode->left_children + 1;
+            currNode = currNode->right;
+        }
+        else {
+            currNode = currNode->left;
         }
     }
-
     return 0;
 }
 
