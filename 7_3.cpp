@@ -1,3 +1,10 @@
+// Латышев Евгений
+// https://contest.yandex.ru/contest/15368/run-report/26535417/
+// Множество натуральных чисел постоянно меняется. Элементы в нем добавляются и удаляются по одному.
+// Вычислите указанные порядковые статистики после каждого добавления или удаления.
+// Требуемая скорость выполнения запроса - O(log n) в среднем.
+// В реализации используйте декартовы деревья.
+
 #include <iostream>
 #include <stack>
 
@@ -8,8 +15,7 @@ struct TreapNode {
 
     int value = 0;
     int priority = 0;
-    int left_children = 0;  // на позицию текущего узла влияют только левые потомки,
-    int total_children = 0;  // но на позицию его родителя влияют и правые потомки, поэтому храним 2 счётчика
+    int total_children = 0;
     TreapNode* left = nullptr;
     TreapNode* right = nullptr;
 };
@@ -17,10 +23,15 @@ struct TreapNode {
 // декартово дерево
 class Treap {
 public:
+    explicit Treap() = default;
     ~Treap();
-    void Add(int value);
+    Treap(const Treap& other);
+    Treap(Treap&& other) noexcept;
+    Treap& operator=(const Treap& other) = delete;
+    Treap& operator=(Treap&& other) noexcept = delete;
+    void Push(int value);
     void Pop(int value);
-    int GetKStat(int k);
+    int GetKStat(int k) const;
 private:
     TreapNode* root = nullptr;
     void delete_subtree(TreapNode* node);
@@ -28,6 +39,35 @@ private:
     TreapNode* merge(TreapNode*, TreapNode*);
     void update_child_count(TreapNode* currNode);
 };
+
+// глубокая копия Treap'а
+Treap::Treap(const Treap& other) {
+    std::stack<TreapNode*> nodesToCopy;
+    std::stack<TreapNode*> nodesToCopyNew;
+    root = new TreapNode(other.root->value);
+    nodesToCopy.push(other.root);
+    nodesToCopyNew.push(root);
+    while (!nodesToCopy.empty()) {
+        TreapNode* currNode = nodesToCopy.top();
+        TreapNode* currNodeNew = nodesToCopyNew.top();
+        nodesToCopy.pop();
+        nodesToCopyNew.pop();
+        if (currNode->right != nullptr) {
+            currNodeNew->right = new TreapNode(currNode->right->value);
+            nodesToCopy.push(currNode->right);
+            nodesToCopyNew.push(currNodeNew->right);
+        }
+        if (currNode->left != nullptr) {
+            currNodeNew->left = new TreapNode(currNode->left->value);
+            nodesToCopy.push(currNode->left);
+            nodesToCopyNew.push(currNodeNew->left);
+        }
+    }
+}
+
+Treap::Treap(Treap&& other) noexcept {
+    root = other.root;
+}
 
 // разрезаем декартово дерево по ключу
 std::pair<TreapNode*, TreapNode*> Treap::split(TreapNode* node, int key) {
@@ -68,7 +108,7 @@ TreapNode* Treap::merge(TreapNode* left, TreapNode* right) {
 }
 
 // добавляем элемент в декартово дерево
-void Treap::Add(int value) {
+void Treap::Push(int value) {
     std::pair<TreapNode*, TreapNode*> pair;
     pair = split(root, value);
     TreapNode* newNode;
@@ -90,32 +130,34 @@ void Treap::Pop(int value) {
 // при изменении структуры дерева пересчитываем его детей
 void Treap::update_child_count(TreapNode* currNode) {
     if (currNode->left != nullptr) {
-        currNode->left_children = currNode->left->total_children + 1;
         if (currNode->right != nullptr) {
-            currNode->total_children = currNode->left_children + currNode->right->total_children + 1;
+            currNode->total_children = currNode->left->total_children + 1 + currNode->right->total_children + 1;
         } else {
-            currNode->total_children = currNode->left_children;
+            currNode->total_children = currNode->left->total_children + 1;
         }
     } else {
-        currNode->left_children = 0;
         if (currNode->right != nullptr) {
             currNode->total_children = currNode->right->total_children + 1;
         } else {
-            currNode->total_children = currNode->left_children;
+            currNode->total_children = 0;
         }
     }
 }
 
 // возвращаем k-ую статистику
-int Treap::GetKStat(int k) {
+int Treap::GetKStat(int k) const {
     TreapNode* currNode = root;
     while (currNode) {
-        if (k == currNode->left_children) {
+        int currLeft = 0;
+        if (currNode->left != nullptr) {
+            currLeft = currNode->left->total_children + 1;
+        }
+        if (k == currLeft) {
             return currNode->value;
         }
-        else if (k > currNode->left_children) {
+        else if (k > currLeft) {
             // вычитаем из k количество элементов левого поддерева (+ текущий), чтобы учесть их при проходе правого
-            k -= currNode->left_children + 1;
+            k -= currLeft + 1;
             currNode = currNode->right;
         }
         else {
@@ -147,7 +189,7 @@ int main() {
         int element = 0;
         std::cin >> element >> k;
         if (element >= 0) {
-            treap.Add(element);
+            treap.Push(element);
             std::cout << treap.GetKStat(k) << "\n";
         } else {
             treap.Pop(-element);
