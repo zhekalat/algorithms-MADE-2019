@@ -106,9 +106,11 @@ bool HashTable::Add(const std::string& key) {
         }
         hash = (hash + secondaryHash(key)) % table.size(); // Если место занято, пробируем двойным хешированием
     }
+    if (!table[hash].deleted) {
+        currNodes++;  // Подсчитываем количество узлов в дереве, чтобы в хеш-таблице всегда было достаточно места
+    }
     table[hash].key = key;
     table[hash].deleted = false;
-    currNodes++;  // Подсчитываем количество узлов в дереве, чтобы в хеш-таблице всегда было достаточно места
     return true;
 }
 
