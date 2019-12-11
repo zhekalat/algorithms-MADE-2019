@@ -59,8 +59,20 @@ int HashTable::secondaryHash(const std::string& key) {
 
 // Увеличение размера хеш-таблицы в 2 раза
 void HashTable::resize() {
-    std::vector<HashTableNode> new_table(table.size() * 2, HashTableNode(""));
     currNodes = 0;  // Пересчитываем количество элементов, т.к. не переносим элменты с проставленным флагом удаления
+    for(auto & i : table) {
+        if (!i.deleted) {
+            currNodes++;
+        }
+    }
+    size_t new_table_size;
+    if (currNodes >= table.size() * 0.75) {
+        new_table_size = table.size() * 2;
+    } else {
+        new_table_size = table.size();
+    }
+    std::vector<HashTableNode> new_table(new_table_size, HashTableNode(""));
+
     for(auto & i : table) {
         if (!i.deleted) { // Переносим только неудалённые элементы
             size_t hash = hornerHash(i.key) % new_table.size(); // Заново рассчитываем хеш, так как изменился размер таблицы
@@ -72,7 +84,6 @@ void HashTable::resize() {
                 }
                 new_table[hash].key = i.key;
             }
-            currNodes++;
         }
     }
     table = new_table;
@@ -101,8 +112,14 @@ bool HashTable::Add(const std::string& key) {
     }
     size_t hash = hornerHash(key) % table.size();
     while (table[hash].key != "" and !table[hash].deleted) {
-        if (table[hash].key == key and !table[hash].deleted) {
-            return false;
+        if (table[hash].key == key) {
+            if (table[hash].deleted) {
+                table[hash].key = key;
+                table[hash].deleted = false;
+                return true;
+            } else {
+                return false;
+            }
         }
         hash = (hash + secondaryHash(key)) % table.size(); // Если место занято, пробируем двойным хешированием
     }
