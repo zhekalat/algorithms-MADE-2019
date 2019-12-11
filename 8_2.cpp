@@ -111,10 +111,9 @@ bool HashTable::Add(const std::string& key) {
         resize();
     }
     size_t hash = hornerHash(key) % table.size();
-    while (table[hash].key != "" and !table[hash].deleted) {
+    while (table[hash].key != "") {
         if (table[hash].key == key) {
             if (table[hash].deleted) {
-                table[hash].key = key;
                 table[hash].deleted = false;
                 return true;
             } else {
