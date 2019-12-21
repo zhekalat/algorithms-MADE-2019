@@ -111,6 +111,8 @@ bool HashTable::Add(const std::string& key) {
         resize();
     }
     size_t hash = hornerHash(key) % table.size();
+    size_t first_deleted = 0;
+    bool found_deleted = false;
     while (table[hash].key != "") {
         if (table[hash].key == key) {
             if (table[hash].deleted) {
@@ -120,13 +122,20 @@ bool HashTable::Add(const std::string& key) {
                 return false;
             }
         }
+        if (table[hash].deleted and !found_deleted) {
+            first_deleted = hash;
+            found_deleted = true;
+        }
         hash = (hash + secondaryHash(key)) % table.size(); // Если место занято, пробируем двойным хешированием
     }
-    if (!table[hash].deleted) {
+    if (found_deleted) { // если по пути до 1 пустого встретили удалённый элемент, вставляем на его место
+        table[first_deleted].key = key;
+        table[first_deleted].deleted = false;
+    } else {  // если не встретили удалённого, то вставляем на место пустого и увеличиваем счётчик количества узлов
+        table[hash].key = key;
+        table[hash].deleted = false;
         currNodes++;  // Подсчитываем количество узлов в дереве, чтобы в хеш-таблице всегда было достаточно места
     }
-    table[hash].key = key;
-    table[hash].deleted = false;
     return true;
 }
 
